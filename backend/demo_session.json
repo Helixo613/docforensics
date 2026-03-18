@@ -1,0 +1,80 @@
+{
+  "session_id": "bc95a1e5",
+  "stats": {
+    "total_sentences": 7,
+    "candidate_pairs": 9,
+    "agreements_found": 1,
+    "contradictions_found": 3,
+    "uncorroborated_count": 1
+  },
+  "contradictions": [
+    {
+      "id": "c_0",
+      "claim_a": {
+        "text": "ImageNet pretraining yields a statistically significant boost in performance across architectures, with a higher boost for smaller architectures.",
+        "doc_name": "chextransfer_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "ImageNet pretraining is less advantageous than previously thought for medical imaging, and its benefit should be evaluated case by case.",
+        "doc_name": "finetuning_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.98
+    },
+    {
+      "id": "c_1",
+      "claim_a": {
+        "text": "ImageNet pretraining is less advantageous than previously thought for medical imaging, and its benefit should be evaluated case by case.",
+        "doc_name": "finetuning_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Transfer learning using pretrained ImageNet models has been a standard approach in many medical imaging tasks.",
+        "doc_name": "supervised_transfer_scale_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.94
+    },
+    {
+      "id": "c_2",
+      "claim_a": {
+        "text": "Transfer learning using pretrained ImageNet models has been the standard approach for chest X ray tasks and many other medical imaging modalities.",
+        "doc_name": "chextransfer_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "ImageNet pretraining is less advantageous than previously thought for medical imaging, and its benefit should be evaluated case by case.",
+        "doc_name": "finetuning_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.94
+    }
+  ],
+  "agreements": [
+    {
+      "id": "a_0",
+      "claim_a": {
+        "text": "Transfer learning using pretrained ImageNet models has been the standard approach for chest X ray tasks and many other medical imaging modalities.",
+        "doc_name": "chextransfer_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Transfer learning using pretrained ImageNet models has been a standard approach in many medical imaging tasks.",
+        "doc_name": "supervised_transfer_scale_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    }
+  ],
+  "uncorroborated": [
+    {
+      "id": "u_0",
+      "claim": {
+        "text": "The truncated models maintained favorable accuracy to parameter tradeoffs, making compact backbones attractive for resource constrained medical imaging deployments.",
+        "doc_name": "chextransfer_excerpt.pdf",
+        "page": 1
+      }
+    }
+  ]
+}
