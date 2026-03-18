@@ -1,0 +1,27 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# WSL artifacts
+*:Zone.Identifier
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Planning artifacts (not part of the shipped project)
+Idea samples.txt
+hackstreet PS (1).pdf
+
+# Flutter (for when frontend is added)
+frontend/.dart_tool/
+frontend/.packages
+frontend/build/
