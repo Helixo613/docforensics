@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import '../config/constants.dart';
+import '../models/session_results.dart';
 import '../services/api_service.dart';
 import '../services/gemini_service.dart';
 import 'results_screen.dart';
@@ -75,16 +76,22 @@ class _UploadScreenState extends State<UploadScreen> {
 
     try {
       setState(() => _loadingMessage = 'Analyzing with AI…');
-      final result = await _api.runFullAnalysis(_selectedFiles);
+      final results = await _api.runFullAnalysis(_selectedFiles);
 
       setState(() => _loadingMessage = 'Refining with Gemini…');
-      final enriched = await _gemini.enrich(result);
+      // Enrich V1 result
+      final enrichedV1 = await _gemini.enrich(results.v1);
+
+      final finalResults = SessionResults(
+        v1: enrichedV1,
+        v2: results.v2,
+      );
 
       if (!mounted) return;
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ResultsScreen(result: enriched),
+          builder: (_) => ResultsScreen(results: finalResults),
         ),
       );
     } catch (e) {

@@ -4,36 +4,41 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../config/constants.dart';
 import '../models/analysis_result.dart';
+import '../models/v2_models.dart';
+import '../models/session_results.dart';
 import '../widgets/demo_banner.dart';
 import '../widgets/finding_card.dart';
 import '../widgets/stats_summary.dart';
+import '../widgets/v2_issue_card.dart';
 
 class ResultsScreen extends StatefulWidget {
-  final AnalysisResult result;
+  final SessionResults results;
 
-  const ResultsScreen({super.key, required this.result});
+  const ResultsScreen({super.key, required this.results});
 
   @override
   State<ResultsScreen> createState() => _ResultsScreenState();
 }
 
 class _ResultsScreenState extends State<ResultsScreen>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+    with TickerProviderStateMixin {
+  late final TabController _v1TabController;
+  int _viewIndex = 0; // 0 for V1 (Evidence), 1 for V2 (Issues)
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _v1TabController = TabController(length: 3, vsync: this);
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
+    _v1TabController.dispose();
     super.dispose();
   }
 
-  AnalysisResult get r => widget.result;
+  AnalysisResult get r => widget.results.v1;
+  IssueMapResponse? get v2 => widget.results.v2;
 
   @override
   Widget build(BuildContext context) {
@@ -44,16 +49,9 @@ class _ResultsScreenState extends State<ResultsScreen>
           children: [
             if (r.isDemoData) const DemoBanner(),
             _buildHeader(),
-            _buildTabs(),
+            _buildViewToggle(),
             Expanded(
-              child: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildContradictionsTab(),
-                  _buildAgreementsTab(),
-                  _buildUncorroboratedTab(),
-                ],
-              ),
+              child: _viewIndex == 0 ? _buildV1View() : _buildV2View(),
             ),
           ],
         ),
@@ -82,7 +80,7 @@ class _ResultsScreenState extends State<ResultsScreen>
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Consensus Brief',
+                  _viewIndex == 0 ? 'Evidence View' : 'Issue Map',
                   style: GoogleFonts.playfairDisplay(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
@@ -94,7 +92,7 @@ class _ResultsScreenState extends State<ResultsScreen>
           ),
 
           // Gemini summary
-          if (r.geminiSummary != null) ...[
+          if (_viewIndex == 0 && r.geminiSummary != null) ...[
             const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(12),
@@ -128,8 +126,158 @@ class _ResultsScreenState extends State<ResultsScreen>
             ),
           ],
 
-          const SizedBox(height: 14),
-          StatsSummary(stats: r.stats),
+          if (_viewIndex == 0) ...[
+            const SizedBox(height: 14),
+            StatsSummary(stats: r.stats),
+          ] else if (v2 != null) ...[
+            const SizedBox(height: 14),
+            _buildV2StatsHeader(),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildViewToggle() {
+    if (v2 == null) return const SizedBox.shrink();
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Container(
+        height: 36,
+        decoration: BoxDecoration(
+          color: const Color(AppColors.surfaceValue),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: _ToggleItem(
+                label: 'Evidence (V1)',
+                isSelected: _viewIndex == 0,
+                onTap: () => setState(() => _viewIndex = 0),
+              ),
+            ),
+            Expanded(
+              child: _ToggleItem(
+                label: 'Issues (V2)',
+                isSelected: _viewIndex == 1,
+                onTap: () => setState(() => _viewIndex = 1),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildV1View() {
+    return Column(
+      children: [
+        _buildTabs(),
+        Expanded(
+          child: TabBarView(
+            controller: _v1TabController,
+            children: [
+              _buildContradictionsTab(),
+              _buildAgreementsTab(),
+              _buildUncorroboratedTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildV2View() {
+    if (v2 == null) return const SizedBox.shrink();
+
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        if (v2!.fallback.shouldFallback) _buildV2FallbackBanner(),
+        ...v2!.issues.map((issue) => V2IssueCard(issue: issue)),
+      ],
+    );
+  }
+
+  Widget _buildV2StatsHeader() {
+    final s = v2!.stats;
+    final c = v2!.coverage;
+    return Row(
+      children: [
+        _StatChip(
+          label: 'Total Issues',
+          value: '${s.totalIssues}',
+          color: const Color(AppColors.accentValue),
+        ),
+        const SizedBox(width: 8),
+        _StatChip(
+          label: 'Coverage',
+          value: '${(c.claimCoverage * 100).toStringAsFixed(0)}%',
+          color: const Color(AppColors.textSecondaryValue),
+        ),
+        const Spacer(),
+        if (v2!.fallback.shouldFallback)
+          const Icon(Icons.warning_amber_rounded,
+              size: 16, color: Color(AppColors.uncorroboratedColorValue)),
+      ],
+    );
+  }
+
+  Widget _buildV2FallbackBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(AppColors.uncorroboratedBgValue),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+            color: const Color(AppColors.uncorroboratedBorderValue)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.info_outline_rounded,
+              size: 16, color: Color(AppColors.uncorroboratedColorValue)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Structure Warning',
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: const Color(AppColors.uncorroboratedColorValue),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                ...v2!.fallback.reasons.map((reason) => Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: Text(
+                    '• $reason',
+                    style: GoogleFonts.inter(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: const Color(AppColors.textSecondaryValue),
+                    ),
+                  ),
+                )),
+                const SizedBox(height: 4),
+                Text(
+                  'We recommend relying on the Evidence View for this session.',
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: const Color(AppColors.textSecondaryValue),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -139,7 +287,7 @@ class _ResultsScreenState extends State<ResultsScreen>
     return Container(
       color: Colors.white,
       child: TabBar(
-        controller: _tabController,
+        controller: _v1TabController,
         labelStyle: GoogleFonts.inter(
             fontSize: 13, fontWeight: FontWeight.w600),
         unselectedLabelStyle:
@@ -353,6 +501,94 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ToggleItem extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ToggleItem({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.all(2),
+        decoration: BoxDecoration(
+          color: isSelected ? Colors.white : Colors.transparent,
+          borderRadius: BorderRadius.circular(6),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 2,
+                    offset: const Offset(0, 1),
+                  )
+                ]
+              : null,
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+            color: isSelected
+                ? const Color(AppColors.accentValue)
+                : const Color(AppColors.textSecondaryValue),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color color;
+
+  const _StatChip({
+    required this.label,
+    required this.value,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        children: [
+          Text(
+            '$label: ',
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              color: color.withOpacity(0.7),
+            ),
+          ),
+          Text(
+            value,
+            style: GoogleFonts.inter(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
       ),
     );
   }

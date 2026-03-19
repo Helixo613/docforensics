@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../config/constants.dart';
 import '../models/analysis_result.dart';
+import '../models/v2_models.dart';
+import '../models/session_results.dart';
 
 class ApiException implements Exception {
   final String message;
@@ -91,6 +93,40 @@ class ApiService {
     }
   }
 
+  // ── V2: POST /v2/analyze/{session_id} ─────────────────────
+  Future<IssueMapResponse> analyzeV2(String sessionId) async {
+    try {
+      final res = await http
+          .post(Uri.parse('$_base/v2/analyze/$sessionId'))
+          .timeout(Duration(seconds: AppConfig.analyzeTimeoutSeconds));
+
+      if (res.statusCode == 200) {
+        return IssueMapResponse.fromJson(jsonDecode(res.body));
+      }
+      throw ApiException('V2 Analysis failed (${res.statusCode})');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('V2 Analysis error: $e');
+    }
+  }
+
+  // ── V2: GET /v2/results/{session_id} ──────────────────────
+  Future<IssueMapResponse> getResultsV2(String sessionId) async {
+    try {
+      final res = await http
+          .get(Uri.parse('$_base/v2/results/$sessionId'))
+          .timeout(Duration(seconds: AppConfig.analyzeTimeoutSeconds));
+
+      if (res.statusCode == 200) {
+        return IssueMapResponse.fromJson(jsonDecode(res.body));
+      }
+      throw ApiException('V2 Results fetch failed (${res.statusCode})');
+    } catch (e) {
+      if (e is ApiException) rethrow;
+      throw ApiException('V2 Results error: $e');
+    }
+  }
+
   // ── GET /demo ─────────────────────────────────────────────
   Future<AnalysisResult> getDemo() async {
     try {
@@ -109,15 +145,33 @@ class ApiService {
   }
 
   // ── Full flow: upload → analyze → fallback to demo ────────
-  Future<AnalysisResult> runFullAnalysis(List<File> files) async {
+  Future<SessionResults> runFullAnalysis(List<File> files) async {
     try {
       final upload = await uploadFiles(files);
-      final result = await analyze(upload.sessionId);
-      return result;
+      final sessionId = upload.sessionId;
+
+      // Run V1 and V2
+      final v1 = await analyze(sessionId);
+
+      // V2 is optional, if it fails we still have V1
+      IssueMapResponse? v2;
+      try {
+        v2 = await analyzeV2(sessionId);
+      } catch (_) {
+        // Retry with GET if POST failed but maybe session exists
+        try {
+          v2 = await getResultsV2(sessionId);
+        } catch (_) {
+          // V2 failure is non-fatal
+        }
+      }
+
+      return SessionResults(v1: v1, v2: v2);
     } catch (_) {
       // Fallback to demo
       try {
-        return await getDemo();
+        final v1 = await getDemo();
+        return SessionResults(v1: v1);
       } catch (e) {
         throw ApiException('Both backend and demo failed: $e');
       }

@@ -1,0 +1,85 @@
+{
+  "session_id": "b5f8a25e",
+  "stats": {
+    "total_sentences": 5,
+    "candidate_pairs": 8,
+    "agreements_found": 2,
+    "contradictions_found": 3,
+    "uncorroborated_count": 0
+  },
+  "contradictions": [
+    {
+      "id": "c_0",
+      "claim_a": {
+        "text": "Medical pretraining can significantly improve downstream medical imaging performance when labeled data is limited and related unlabeled images are available.",
+        "doc_name": "novel_transfer_learning_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Transfer learning offers limited performance gains on medical imaging tasks because medical images differ substantially from natural images.",
+        "doc_name": "transfusion_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    },
+    {
+      "id": "c_1",
+      "claim_a": {
+        "text": "Medical pretraining can significantly improve downstream medical imaging performance when labeled data is limited and related unlabeled images are available.",
+        "doc_name": "self_supervised_transfer_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Transfer learning offers limited performance gains on medical imaging tasks because medical images differ substantially from natural images.",
+        "doc_name": "transfusion_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    },
+    {
+      "id": "c_2",
+      "claim_a": {
+        "text": "Transfer learning offers limited performance gains on medical imaging tasks because medical images differ substantially from natural images.",
+        "doc_name": "novel_transfer_learning_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Medical pretraining can significantly improve downstream medical imaging performance when labeled data is limited and related unlabeled images are available.",
+        "doc_name": "self_supervised_transfer_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    }
+  ],
+  "agreements": [
+    {
+      "id": "a_0",
+      "claim_a": {
+        "text": "Transfer learning offers limited performance gains on medical imaging tasks because medical images differ substantially from natural images.",
+        "doc_name": "novel_transfer_learning_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Transfer learning offers limited performance gains on medical imaging tasks because medical images differ substantially from natural images.",
+        "doc_name": "transfusion_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    },
+    {
+      "id": "a_1",
+      "claim_a": {
+        "text": "Medical pretraining can significantly improve downstream medical imaging performance when labeled data is limited and related unlabeled images are available.",
+        "doc_name": "novel_transfer_learning_excerpt.pdf",
+        "page": 1
+      },
+      "claim_b": {
+        "text": "Medical pretraining can significantly improve downstream medical imaging performance when labeled data is limited and related unlabeled images are available.",
+        "doc_name": "self_supervised_transfer_excerpt.pdf",
+        "page": 1
+      },
+      "confidence": 0.99
+    }
+  ],
+  "uncorroborated": []
+}
