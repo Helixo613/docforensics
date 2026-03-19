@@ -1,99 +1,182 @@
 # DocForensics AI
 
-Cross-document contradiction and agreement detector with evidence tracing.
+**Cross-document contradiction and agreement detector for research papers.**
 
-Upload research PDFs, and the system finds where papers agree, contradict, or make uncorroborated claims — with page-level citations back to the source text.
+DocForensics AI lets researchers upload multiple PDFs and automatically identifies where papers **agree**, **contradict**, or make **uncorroborated claims** — with page-level citations linking every finding back to the exact source text.
 
-## What This Is
-
-**V1 (Evidence View)** — the core product. Sentence-level NLI (Natural Language Inference) compares claims across documents and classifies each pair as agreement, contradiction, or neutral. Every finding links back to exact text, document name, and page number.
-
-**V2 (Issue Map)** — optional synthesis layer. Groups V1's pair-level findings into higher-level "issues" using connected-component analysis over the agreement/contradiction graph. Adds structural quality signals, merge-risk flags, and fallback detection. If V2 produces weak structure, the frontend recommends falling back to V1.
-
-V1 is always the default. V2 is additive and non-destructive.
+Built for [Hackstreet 4.0](https://hackstreet.dev).
 
 ---
 
-## Project Structure
+## The Problem
 
-```
-.
-├── backend/                    # FastAPI + NLP pipeline
-│   ├── app/
-│   │   ├── main.py             # App entry, CORS, router registration
-│   │   ├── config.py           # Thresholds, model names
-│   │   ├── schemas.py          # V1 Pydantic models
-│   │   ├── v2_schemas.py       # V2 Pydantic models
-│   │   ├── storage.py          # In-memory session store
-│   │   ├── routers/
-│   │   │   ├── health.py       # GET /health
-│   │   │   ├── upload.py       # POST /upload
-│   │   │   ├── analyze.py      # POST /analyze/{session_id}
-│   │   │   ├── results.py      # GET /results/{session_id}
-│   │   │   ├── search.py       # GET /search/{session_id}?q=
-│   │   │   ├── demo.py         # GET /demo
-│   │   │   └── v2.py           # POST /v2/analyze, GET /v2/results
-│   │   ├── services/
-│   │   │   ├── pdf_extractor.py
-│   │   │   ├── sentence_splitter.py
-│   │   │   ├── filters.py
-│   │   │   ├── embeddings.py
-│   │   │   ├── candidate_generation.py
-│   │   │   ├── nli.py
-│   │   │   ├── bucketing.py
-│   │   │   ├── search.py
-│   │   │   ├── pair_analysis.py      # Shared V1 analysis logic
-│   │   │   ├── v2_issue_map.py       # Issue grouping + quality
-│   │   │   └── demo_loader.py
-│   │   └── utils/
-│   │       └── model_loader.py       # Background model loading
-│   ├── demo_papers/            # Primary demo PDFs
-│   ├── demo_papers_secondary/  # Secondary demo PDFs
-│   ├── demo_session.json       # Frozen primary demo output
-│   ├── demo_session_2.json     # Frozen secondary demo output
-│   ├── demo_assets/            # Synthetic papers for V2 testing
-│   ├── scripts/
-│   │   ├── run_backend.ps1     # Windows PowerShell launcher
-│   │   └── smoke_test.ps1      # PowerShell smoke test
-│   ├── tests/
-│   │   └── test_v2_issue_map.py
-│   └── requirements.txt
-├── lib/                        # Flutter frontend
-│   ├── main.dart
-│   ├── config/constants.dart
-│   ├── models/
-│   │   ├── analysis_result.dart
-│   │   ├── v2_models.dart
-│   │   └── session_results.dart
-│   ├── screens/
-│   │   ├── upload_screen.dart
-│   │   └── results_screen.dart
-│   ├── services/
-│   │   ├── api_service.dart
-│   │   └── gemini_service.dart
-│   └── widgets/
-│       ├── finding_card.dart
-│       ├── stats_summary.dart
-│       ├── demo_banner.dart
-│       └── v2_issue_card.dart
-└── pubspec.yaml
-```
+Researchers reviewing multiple papers on the same topic spend hours manually cross-referencing claims. Conflicting findings are easy to miss, agreements across studies go unnoticed, and solo claims that no other paper supports slip through.
+
+## Our Solution
+
+DocForensics AI automates this entirely:
+
+1. **Upload** 1-5 research PDFs
+2. **NLP pipeline** extracts sentences, generates embeddings, and runs Natural Language Inference (NLI) to classify every cross-document claim pair as agreement, contradiction, or neutral
+3. **Issue Map** (V2) groups related findings into higher-level issues with quality signals
+4. **Gemini AI** (optional) adds human-readable explanations to each finding
+5. **Results** are displayed in a clean mobile UI with expandable evidence cards and source citations
 
 ---
 
-## Setup
+## How It Works Under the Hood
+
+### V1 — Evidence View (Core)
+
+The NLP pipeline processes uploaded PDFs through these stages:
+
+```
+PDFs → Text extraction (PyMuPDF) → Sentence splitting (spaCy)
+    → Noise filtering → Sentence embeddings (MiniLM-L6-v2, 384-dim)
+    → Candidate pair generation (cosine similarity, top-k)
+    → NLI classification (DeBERTa-v3-xsmall)
+    → Bucketing: Contradictions / Agreements / Uncorroborated
+```
+
+Each finding includes: the two claims, their source documents, page numbers, NLI confidence score, and the original text.
+
+### V2 — Issue Map (Synthesis Layer)
+
+Built on top of V1's pair results:
+
+- **Connected-component analysis** groups related claim pairs into "issues"
+- **2-coloring** assigns claims to opposing sides within each issue
+- **Quality signals** flag weak groupings, merge risks, and structural problems
+- **Fallback detection** recommends switching to V1 Evidence View if the issue structure is too noisy
+
+V2 is optional and non-destructive — V1 evidence is always available.
+
+### Gemini Enrichment (Optional)
+
+If a Gemini API key is configured, each contradiction and agreement gets a plain-English explanation generated by Gemini 1.5 Flash. If no key is set, results are shown without AI summaries — everything still works.
+
+---
+
+## Running on Windows
 
 ### Prerequisites
 
-- Python 3.10+ (backend)
-- Flutter SDK (frontend)
-- ~2GB disk for ML models (downloaded on first run)
+| Tool | Version | Install |
+|------|---------|---------|
+| Python | 3.10+ | [python.org](https://www.python.org/downloads/) |
+| Flutter SDK | 3.x | [flutter.dev](https://docs.flutter.dev/get-started/install/windows/mobile) |
+| Android Studio | Latest | [developer.android.com](https://developer.android.com/studio) (for emulator) |
+| Git | Any | [git-scm.com](https://git-scm.com/download/win) |
 
-### 1. Backend Setup
+You'll also need ~2GB free disk space for ML models (downloaded automatically on first backend run).
 
-#### On WSL (recommended for development)
+### Step 1: Clone the Repo
+
+```powershell
+git clone https://github.com/YOUR_USERNAME/hackstreet.git
+cd hackstreet
+git checkout Full_version
+```
+
+### Step 2: Start the Backend
+
+Open a **PowerShell** terminal:
+
+```powershell
+cd backend
+
+# Create virtual environment
+python -m venv .venv
+
+# Activate it
+.\.venv\Scripts\Activate.ps1
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Download spaCy language model
+python -m spacy download en_core_web_sm
+
+# Start the server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+```
+
+Or use the included script:
+
+```powershell
+cd backend
+.\scripts\run_backend.ps1 -Port 8000
+```
+
+**First run**: Models (~500MB) download automatically. Wait until the terminal shows the Uvicorn startup message. You can verify with:
+
+```powershell
+curl http://127.0.0.1:8000/health
+```
+
+It should return `{"status": "ok", "models_loaded": true}` once ready.
+
+> You may see a HuggingFace warning about `position_ids` — this is harmless.
+
+### Step 3: Configure the Flutter App
+
+Edit `lib/config/constants.dart` and set the backend URL:
+
+```dart
+static const String backendBaseUrl = 'http://10.0.2.2:8000';
+```
+
+| Setup | URL to use |
+|-------|-----------|
+| Android emulator (backend on same machine) | `http://10.0.2.2:8000` |
+| Physical Android device (same WiFi) | `http://YOUR_PC_IP:8000` |
+| Chrome/Windows desktop | `http://localhost:8000` |
+
+> For physical device: find your PC's IP with `ipconfig` in PowerShell. Use the IPv4 address from your WiFi adapter.
+
+### Step 4: Set Up Gemini (Optional)
+
+In the same `lib/config/constants.dart`:
+
+```dart
+static const String geminiApiKey = 'YOUR_ACTUAL_KEY_HERE';
+```
+
+Get a free key at [aistudio.google.com](https://aistudio.google.com). If you skip this, the app works fine — just without AI-generated explanations.
+
+### Step 5: Run the Flutter App
+
+Open a **second** PowerShell terminal:
+
+```powershell
+# From the repo root (not backend/)
+flutter pub get
+flutter run
+```
+
+Select your target device (Android emulator, Chrome, or Windows desktop).
+
+### Step 6: Android Emulator — Enable Cleartext Traffic
+
+If the app can't reach the backend on Android, add `android:usesCleartextTraffic="true"` to `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<application
+    android:usesCleartextTraffic="true"
+    android:label="consensus_brief"
+    ...>
+```
+
+Then restart the app.
+
+---
+
+## Running with WSL Backend
+
+If you prefer running the Python backend inside WSL:
 
 ```bash
+# Inside WSL
 cd backend
 python -m venv .venv
 source .venv/bin/activate
@@ -102,180 +185,189 @@ python -m spacy download en_core_web_sm
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Use `--host 0.0.0.0` so the backend is reachable from Windows/emulators.
-
-#### On Windows (native PowerShell)
+Then set up port forwarding from Windows (run in **admin PowerShell**):
 
 ```powershell
-cd backend
-.\scripts\run_backend.ps1 -Port 8000
-```
-
-Or manually:
-
-```powershell
-cd backend
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m spacy download en_core_web_sm
-uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
-```
-
-If port 8000 is occupied, use any free port (e.g., 8080).
-
-#### First-run behavior
-
-Models download on first startup (~1-2 min). `GET /health` returns `models_loaded: false` until ready. The app handles this — just wait.
-
-You may see a HuggingFace warning about `position_ids` for the NLI model. This is harmless and does not affect results.
-
-### 2. Frontend Setup
-
-```bash
-# From the repo root (not backend/)
-flutter pub get
-flutter run
-```
-
-### 3. Configure Backend URL
-
-Edit `lib/config/constants.dart`:
-
-```dart
-static const String backendBaseUrl = 'http://YOUR_BACKEND:8000';
-```
-
-| Scenario | URL |
-|----------|-----|
-| Android emulator → WSL backend | `http://10.0.2.2:8000` |
-| Android emulator → Windows backend | `http://10.0.2.2:8000` |
-| Physical device → same WiFi | `http://192.168.x.x:8000` (your machine's IP) |
-| iOS simulator | `http://localhost:8000` |
-| WSL backend from Windows | `http://localhost:8000` (if port-forwarded) |
-
-#### WSL Port Forwarding (if running backend in WSL, frontend on Windows)
-
-```powershell
-# Run in admin PowerShell on Windows
 netsh interface portproxy add v4tov4 listenport=8000 listenaddress=0.0.0.0 connectport=8000 connectaddress=$(wsl hostname -I | ForEach-Object { $_.Trim() })
 ```
 
-Note: WSL IP changes on restart. Re-run the portproxy command after WSL restarts.
-
-### 4. Configure Gemini (optional)
-
-In `lib/config/constants.dart`:
-
-```dart
-static const String geminiApiKey = 'YOUR_GEMINI_API_KEY';
-```
-
-If left as the placeholder, Gemini enrichment is silently skipped. Results still work without it.
+> WSL's IP changes on restart. Re-run the portproxy command after each WSL restart. Find the current IP with `wsl hostname -I`.
 
 ---
 
-## API Endpoints
+## Project Structure
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/health` | Model loading status |
-| POST | `/upload` | Upload PDFs, get session_id |
-| POST | `/analyze/{session_id}` | Run V1 pair analysis |
-| GET | `/results/{session_id}` | Cached V1 results |
-| GET | `/search/{session_id}?q=` | Semantic search over session |
-| GET | `/demo` | Frozen demo results |
-| POST | `/v2/analyze/{session_id}` | Run V2 issue map (requires V1 first) |
-| GET | `/v2/results/{session_id}` | Cached V2 results |
+```
+.
+├── backend/                         # FastAPI + NLP pipeline
+│   ├── app/
+│   │   ├── main.py                  # App entry, CORS, router registration
+│   │   ├── config.py                # Thresholds, model names
+│   │   ├── schemas.py               # V1 Pydantic response models
+│   │   ├── v2_schemas.py            # V2 Pydantic response models
+│   │   ├── storage.py               # In-memory session store
+│   │   ├── routers/
+│   │   │   ├── health.py            # GET /health
+│   │   │   ├── upload.py            # POST /upload
+│   │   │   ├── analyze.py           # POST /analyze/{id} — V1 pair analysis
+│   │   │   ├── results.py           # GET /results/{id}
+│   │   │   ├── search.py            # GET /search/{id}?q=
+│   │   │   ├── demo.py              # GET /demo
+│   │   │   └── v2.py                # POST /v2/analyze/{id}, GET /v2/results/{id}
+│   │   └── services/
+│   │       ├── pdf_extractor.py     # PyMuPDF text extraction
+│   │       ├── sentence_splitter.py # spaCy sentence segmentation
+│   │       ├── filters.py           # Noise/boilerplate filtering
+│   │       ├── embeddings.py        # MiniLM-L6-v2 sentence embeddings
+│   │       ├── candidate_generation.py  # Cosine similarity top-k pairs
+│   │       ├── nli.py               # DeBERTa NLI classification
+│   │       ├── bucketing.py         # Contradiction/agreement/neutral sorting
+│   │       ├── search.py            # Semantic search over session
+│   │       ├── pair_analysis.py     # Shared V1 analysis (used by V1 + V2)
+│   │       ├── v2_issue_map.py      # Issue grouping, 2-coloring, quality
+│   │       └── demo_loader.py       # Frozen demo data loader
+│   ├── tests/
+│   │   └── test_v2_issue_map.py     # V2 unit tests (8 tests)
+│   ├── scripts/
+│   │   ├── run_backend.ps1          # PowerShell launcher
+│   │   └── smoke_test.ps1           # PowerShell smoke test
+│   ├── demo_papers/                 # Demo PDFs (primary set)
+│   ├── demo_papers_secondary/       # Demo PDFs (secondary set)
+│   └── requirements.txt
+│
+├── lib/                             # Flutter frontend
+│   ├── main.dart                    # App entry, theme, routing
+│   ├── config/constants.dart        # Backend URL, Gemini key, colors
+│   ├── models/
+│   │   ├── analysis_result.dart     # V1 data models
+│   │   ├── v2_models.dart           # V2 issue map models
+│   │   └── session_results.dart     # Wrapper: V1 + optional V2
+│   ├── screens/
+│   │   ├── upload_screen.dart       # File picker + analysis trigger
+│   │   └── results_screen.dart      # Tabbed results with V1/V2 toggle
+│   ├── services/
+│   │   ├── api_service.dart         # Backend HTTP client (V1 + V2)
+│   │   └── gemini_service.dart      # Gemini enrichment client
+│   └── widgets/
+│       ├── finding_card.dart        # V1 contradiction/agreement cards
+│       ├── stats_summary.dart       # Stats row (counts, scores)
+│       ├── demo_banner.dart         # "Demo mode" warning banner
+│       └── v2_issue_card.dart       # V2 issue cards with sides
+│
+├── android/                         # Android platform files
+├── ios/                             # iOS platform files
+├── web/                             # Web platform files
+├── windows/                         # Windows desktop platform files
+├── pubspec.yaml                     # Flutter dependencies
+└── README.md
+```
 
-Interactive API docs at `http://localhost:8000/docs` once backend is running.
+---
+
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/health` | Returns `{status, models_loaded}` |
+| `POST` | `/upload` | Upload PDFs (multipart), returns `{session_id, documents}` |
+| `POST` | `/analyze/{session_id}` | Run V1 NLI analysis on uploaded docs |
+| `GET` | `/results/{session_id}` | Retrieve cached V1 results |
+| `GET` | `/search/{session_id}?q=` | Semantic search across session claims |
+| `GET` | `/demo` | Frozen demo results (no upload needed) |
+| `POST` | `/v2/analyze/{session_id}` | Build V2 issue map from V1 results |
+| `GET` | `/v2/results/{session_id}` | Retrieve cached V2 results |
+
+Interactive Swagger docs available at `http://localhost:8000/docs` when the backend is running.
 
 ---
 
 ## App Flow
 
 ```
-Upload Screen → pick 1-5 PDFs
-    ↓
-POST /upload → session_id
-    ↓
-POST /analyze/{session_id} → V1 pair results
-    ↓
-POST /v2/analyze/{session_id} → V2 issue map (optional, non-fatal if fails)
-    ↓
-Gemini enrichment (optional, non-fatal if no key)
-    ↓
+User opens app
+    |
+    v
+Upload Screen — pick 1-5 PDFs
+    |
+    v
+POST /upload ──────────────> session_id
+    |
+    v
+POST /analyze/{session_id} ─> V1 pair results (contradictions, agreements, solo)
+    |
+    v
+POST /v2/analyze/{session_id} ─> V2 issue map (optional, skipped if fails)
+    |
+    v
+Gemini enrichment (optional, skipped if no API key)
+    |
+    v
 Results Screen
-  ├── Evidence View (V1): Contradictions / Agreements / Solo tabs
-  └── Issue Map (V2): Grouped issues with sides, quality, fallback warnings
+    ├── Evidence View (V1): Contradictions | Agreements | Solo tabs
+    └── Issue Map (V2): Grouped issues with sides + quality signals
 ```
 
-If backend fails at any step, the app falls back to `/demo` and shows a banner.
+If the backend is unreachable, the app automatically falls back to `/demo` and shows a yellow banner.
 
 ---
 
-## Verification
+## Running Tests
 
-### Backend smoke test (PowerShell)
+### V2 Unit Tests
 
 ```powershell
-cd backend
-.\scripts\smoke_test.ps1 -BaseUrl "http://127.0.0.1:8000" -SkipLive
-```
-
-### V2 unit tests
-
-```bash
 cd backend
 python -m pytest tests/test_v2_issue_map.py -v
 ```
 
 Or without pytest:
 
-```bash
+```powershell
 cd backend
 python -m unittest tests.test_v2_issue_map -v
 ```
 
-### Quick manual check
+### Smoke Test (PowerShell)
 
-```bash
-# Health
+```powershell
+cd backend
+.\scripts\smoke_test.ps1 -BaseUrl "http://127.0.0.1:8000"
+```
+
+### Manual Verification
+
+```powershell
+# Check backend health
 curl http://localhost:8000/health
 
-# Demo
-curl http://localhost:8000/demo | python -m json.tool
+# Get demo results
+curl http://localhost:8000/demo
 ```
 
 ---
 
 ## Troubleshooting
 
-**Backend not reachable from Flutter app**
-- Check the URL in `lib/config/constants.dart`
-- Ensure backend is running with `--host 0.0.0.0` (not just `127.0.0.1`) if connecting from emulator/device
-- For Android: add `android:usesCleartextTraffic="true"` to `android/app/src/main/AndroidManifest.xml`
-
-**WSL IP changed after restart**
-- Re-run the `netsh interface portproxy` command with the new WSL IP
-- Find current WSL IP: `wsl hostname -I`
-
-**Port already in use**
-- Use a different port: `uvicorn app.main:app --port 8080`
-- Update `constants.dart` to match
-
-**Flutter packages not resolving**
-- Run `flutter pub get` from the repo root
-- If lock file issues: delete `pubspec.lock` and re-run `flutter pub get`
-
-**Models slow to load**
-- First run downloads ~500MB of models. Subsequent runs use cache
-- Check progress: `GET /health` → `models_loaded` field
+| Problem | Fix |
+|---------|-----|
+| Backend not reachable from app | Check URL in `lib/config/constants.dart`. Use `10.0.2.2` for Android emulator, your PC's IP for physical device. |
+| Android blocks HTTP requests | Add `android:usesCleartextTraffic="true"` to `AndroidManifest.xml` (see Step 6 above). |
+| Port 8000 already in use | Use a different port: `uvicorn app.main:app --port 8080` and update `constants.dart`. |
+| Models take forever to download | First run downloads ~500MB. Check `GET /health` — `models_loaded` will be `true` when ready. |
+| WSL IP changed after restart | Re-run the `netsh interface portproxy` command. Find new IP: `wsl hostname -I`. |
+| `flutter pub get` fails | Delete `pubspec.lock` and retry. Make sure Flutter SDK is on your PATH. |
+| PowerShell script execution blocked | Run `Set-ExecutionPolicy -Scope CurrentUser -ExecutionPolicy RemoteSigned` first. |
 
 ---
 
 ## Tech Stack
 
-- **Backend**: FastAPI, PyMuPDF, spaCy, sentence-transformers (MiniLM-L6-v2), cross-encoder (nli-deberta-v3-xsmall)
-- **Frontend**: Flutter, Google Fonts, file_picker
-- **Optional**: Gemini API for AI-enriched summaries
+| Layer | Technology |
+|-------|-----------|
+| Backend framework | FastAPI + Uvicorn |
+| PDF parsing | PyMuPDF |
+| Sentence segmentation | spaCy (`en_core_web_sm`) |
+| Sentence embeddings | `all-MiniLM-L6-v2` (384-dim, sentence-transformers) |
+| NLI classification | `cross-encoder/nli-deberta-v3-xsmall` |
+| Frontend | Flutter (Android, iOS, Web, Windows, macOS, Linux) |
+| AI enrichment | Gemini 1.5 Flash (optional) |
