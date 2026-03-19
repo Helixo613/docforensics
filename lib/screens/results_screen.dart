@@ -90,6 +90,17 @@ class _ResultsScreenState extends State<ResultsScreen>
               ),
             ],
           ),
+          const SizedBox(height: 6),
+          Text(
+            _viewIndex == 0
+                ? 'V1 is the source-of-truth evidence layer for this session.'
+                : 'V2 organizes the same evidence into issue-level structure when available.',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              height: 1.45,
+              color: const Color(AppColors.textTertiaryValue),
+            ),
+          ),
 
           // Gemini summary
           if (_viewIndex == 0 && r.geminiSummary != null) ...[
@@ -98,11 +109,11 @@ class _ResultsScreenState extends State<ResultsScreen>
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color:
-                    const Color(AppColors.accentValue).withOpacity(0.05),
+                    const Color(AppColors.accentValue).withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(
                     color: const Color(AppColors.accentValue)
-                        .withOpacity(0.15)),
+                        .withValues(alpha: 0.15)),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,10 +204,21 @@ class _ResultsScreenState extends State<ResultsScreen>
   Widget _buildV2View() {
     if (v2 == null) return const SizedBox.shrink();
 
+    if (v2!.issues.isEmpty) {
+      return const _EmptyState(
+        icon: Icons.account_tree_outlined,
+        message: 'No issue structure available',
+        sub: 'This session is better reviewed in the Evidence View.',
+        color: Color(AppColors.textTertiaryValue),
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
         if (v2!.fallback.shouldFallback) _buildV2FallbackBanner(),
+        _buildV2OverviewCard(),
+        const SizedBox(height: 12),
         ...v2!.issues.map((issue) => V2IssueCard(issue: issue)),
       ],
     );
@@ -214,7 +236,7 @@ class _ResultsScreenState extends State<ResultsScreen>
         ),
         const SizedBox(width: 8),
         _StatChip(
-          label: 'Coverage',
+          label: 'Claim Coverage',
           value: '${(c.claimCoverage * 100).toStringAsFixed(0)}%',
           color: const Color(AppColors.textSecondaryValue),
         ),
@@ -223,6 +245,75 @@ class _ResultsScreenState extends State<ResultsScreen>
           const Icon(Icons.warning_amber_rounded,
               size: 16, color: Color(AppColors.uncorroboratedColorValue)),
       ],
+    );
+  }
+
+  Widget _buildV2OverviewCard() {
+    final stats = v2!.stats;
+    final coverage = v2!.coverage;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(AppColors.borderValue)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Issue map coverage',
+            style: GoogleFonts.inter(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: const Color(AppColors.textPrimaryValue),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'This is a structured lens over pair-derived evidence. Uncorroborated claims remain outside the issue map.',
+            style: GoogleFonts.inter(
+              fontSize: 12,
+              height: 1.45,
+              color: const Color(AppColors.textSecondaryValue),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _StatChip(
+                label: 'Contested',
+                value: '${stats.contestedIssues}',
+                color: const Color(AppColors.contradictionColorValue),
+              ),
+              _StatChip(
+                label: 'Aligned',
+                value: '${stats.alignedIssues}',
+                color: const Color(AppColors.agreementColorValue),
+              ),
+              _StatChip(
+                label: 'Mixed',
+                value: '${stats.mixedIssues}',
+                color: const Color(AppColors.uncorroboratedColorValue),
+              ),
+              _StatChip(
+                label: 'Outside Map',
+                value: '${coverage.uncorroboratedClaimsOutsideIssueMap}',
+                color: const Color(AppColors.textSecondaryValue),
+              ),
+              if (coverage.structurallyAmbiguousClaimsInIssues > 0)
+                _StatChip(
+                  label: 'Ambiguous',
+                  value: '${coverage.structurallyAmbiguousClaimsInIssues}',
+                  color: const Color(AppColors.uncorroboratedColorValue),
+                ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -439,7 +530,7 @@ class _TabLabel extends StatelessWidget {
             padding:
                 const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.12),
+              color: color.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -478,7 +569,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, size: 48, color: color.withOpacity(0.4)),
+            Icon(icon, size: 48, color: color.withValues(alpha: 0.4)),
             const SizedBox(height: 16),
             Text(
               message,
@@ -529,7 +620,7 @@ class _ToggleItem extends StatelessWidget {
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 2,
                     offset: const Offset(0, 1),
                   )
@@ -568,7 +659,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Row(
@@ -577,7 +668,7 @@ class _StatChip extends StatelessWidget {
             '$label: ',
             style: GoogleFonts.inter(
               fontSize: 11,
-              color: color.withOpacity(0.7),
+              color: color.withValues(alpha: 0.7),
             ),
           ),
           Text(

@@ -23,7 +23,7 @@ class ConsensusBriefApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Consensus Brief',
+      title: 'DocForensics AI',
       debugShowCheckedModeBanner: false,
       theme: _buildTheme(),
       home: const UploadScreen(),

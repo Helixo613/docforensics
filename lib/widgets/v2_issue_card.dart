@@ -59,6 +59,9 @@ class _V2IssueCardState extends State<V2IssueCard> {
   @override
   Widget build(BuildContext context) {
     final issue = widget.issue;
+    final labelMeta = issue.labelKind == 'representative_claim_excerpt'
+        ? 'representative excerpt'
+        : issue.labelKind;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
       margin: const EdgeInsets.only(bottom: 12),
@@ -68,7 +71,7 @@ class _V2IssueCardState extends State<V2IssueCard> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: _statusColor.withOpacity(0.06),
+            color: _statusColor.withValues(alpha: 0.06),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -115,12 +118,24 @@ class _V2IssueCardState extends State<V2IssueCard> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${issue.documentsInvolved.length} documents involved',
+                            labelMeta.isEmpty
+                                ? '${issue.documentsInvolved.length} documents involved'
+                                : '${issue.documentsInvolved.length} documents involved · $labelMeta',
                             style: GoogleFonts.inter(
                               fontSize: 11,
                               color: const Color(AppColors.textTertiaryValue),
                             ),
                           ),
+                          if (issue.documentsInvolved.isNotEmpty) ...[
+                            const SizedBox(height: 10),
+                            Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: issue.documentsInvolved
+                                  .map((doc) => _DocumentChip(label: doc))
+                                  .toList(),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -147,8 +162,9 @@ class _V2IssueCardState extends State<V2IssueCard> {
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 16),
                           child: _SideBlock(
-                            sideName: side.sideId,
+                            sideName: _displaySideName(side.sideId),
                             claims: side.claims,
+                            documents: side.documents,
                             accentColor: _statusColor,
                           ),
                         );
@@ -158,6 +174,7 @@ class _V2IssueCardState extends State<V2IssueCard> {
                       _SideBlock(
                         sideName: 'Mixed / Ambiguous',
                         claims: issue.mixedClaims,
+                        documents: const [],
                         accentColor: const Color(AppColors.textTertiaryValue),
                       ),
                       const SizedBox(height: 16),
@@ -166,6 +183,7 @@ class _V2IssueCardState extends State<V2IssueCard> {
                       _SideBlock(
                         sideName: 'Unclear',
                         claims: issue.unclearClaims,
+                        documents: const [],
                         accentColor: const Color(AppColors.textTertiaryValue),
                       ),
                     ],
@@ -177,6 +195,17 @@ class _V2IssueCardState extends State<V2IssueCard> {
         ),
       ),
     );
+  }
+
+  String _displaySideName(String sideId) {
+    switch (sideId) {
+      case 'side_0':
+        return 'Side A';
+      case 'side_1':
+        return 'Side B';
+      default:
+        return sideId.replaceAll('_', ' ');
+    }
   }
 }
 
@@ -191,7 +220,7 @@ class _IssueChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -229,7 +258,7 @@ class _QualityChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -252,7 +281,7 @@ class _MergeRiskChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: const Color(AppColors.contradictionColorValue).withOpacity(0.1),
+        color: const Color(AppColors.contradictionColorValue).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Row(
@@ -278,11 +307,13 @@ class _MergeRiskChip extends StatelessWidget {
 class _SideBlock extends StatelessWidget {
   final String sideName;
   final List<V2Claim> claims;
+  final List<String> documents;
   final Color accentColor;
 
   const _SideBlock({
     required this.sideName,
     required this.claims,
+    required this.documents,
     required this.accentColor,
   });
 
@@ -300,6 +331,16 @@ class _SideBlock extends StatelessWidget {
             color: accentColor,
           ),
         ),
+        if (documents.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: documents
+                .map((doc) => _DocumentChip(label: doc))
+                .toList(),
+          ),
+        ],
         const SizedBox(height: 8),
         ...claims.map((claim) => _ClaimItem(claim: claim)),
       ],
@@ -318,9 +359,11 @@ class _ClaimItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.6),
+        color: Colors.white.withValues(alpha: 0.6),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(AppColors.borderValue).withOpacity(0.5)),
+        border: Border.all(
+          color: const Color(AppColors.borderValue).withValues(alpha: 0.5),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -353,6 +396,31 @@ class _ClaimItem extends StatelessWidget {
             ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _DocumentChip extends StatelessWidget {
+  final String label;
+
+  const _DocumentChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(AppColors.surfaceValue),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(AppColors.borderValue)),
+      ),
+      child: Text(
+        label,
+        style: GoogleFonts.inter(
+          fontSize: 10,
+          color: const Color(AppColors.textSecondaryValue),
+        ),
       ),
     );
   }

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as p;
 import '../config/constants.dart';
+import '../models/analysis_result.dart';
 import '../models/session_results.dart';
 import '../services/api_service.dart';
 import '../services/gemini_service.dart';
@@ -24,8 +25,26 @@ class _UploadScreenState extends State<UploadScreen> {
 
   List<File> _selectedFiles = [];
   bool _isLoading = false;
+  bool _isCheckingHealth = true;
   String _loadingMessage = '';
   String? _errorMessage;
+  HealthResponse? _health;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshHealth();
+  }
+
+  Future<void> _refreshHealth() async {
+    setState(() => _isCheckingHealth = true);
+    final health = await _api.checkHealth();
+    if (!mounted) return;
+    setState(() {
+      _health = health;
+      _isCheckingHealth = false;
+    });
+  }
 
   // ── File picking ────────────────────────────────────────────
   Future<void> _pickFiles() async {
@@ -101,6 +120,32 @@ class _UploadScreenState extends State<UploadScreen> {
     }
   }
 
+  Future<void> _openDemo() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+      _loadingMessage = 'Loading demo session…';
+    });
+
+    try {
+      final demo = await _api.getDemo();
+      final enriched = await _gemini.enrich(demo);
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultsScreen(
+            results: SessionResults(v1: enriched),
+          ),
+        ),
+      );
+    } catch (e) {
+      setState(() => _errorMessage = e.toString());
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
   // ── UI ──────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
@@ -157,7 +202,7 @@ class _UploadScreenState extends State<UploadScreen> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: const Color(AppColors.accentValue).withOpacity(0.1),
+                  color: const Color(AppColors.accentValue).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -168,7 +213,7 @@ class _UploadScreenState extends State<UploadScreen> {
               ),
               const SizedBox(width: 12),
               Text(
-                'Consensus Brief',
+                'DocForensics AI',
                 style: GoogleFonts.playfairDisplay(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -179,12 +224,18 @@ class _UploadScreenState extends State<UploadScreen> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Upload research papers to find agreements,\ncontradictions, and solo claims.',
+            'Compare overlapping documents, surface contradictions,\nand trace every finding back to the source.',
             style: GoogleFonts.inter(
               fontSize: 13,
               height: 1.5,
               color: const Color(AppColors.textSecondaryValue),
             ),
+          ),
+          const SizedBox(height: 14),
+          _BackendStatusCard(
+            isChecking: _isCheckingHealth,
+            health: _health,
+            onRefresh: _refreshHealth,
           ),
         ],
       ),
@@ -201,12 +252,12 @@ class _UploadScreenState extends State<UploadScreen> {
         decoration: BoxDecoration(
           color: _selectedFiles.isEmpty
               ? Colors.white
-              : const Color(AppColors.accentValue).withOpacity(0.03),
+              : const Color(AppColors.accentValue).withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _selectedFiles.isEmpty
                 ? const Color(AppColors.borderValue)
-                : const Color(AppColors.accentValue).withOpacity(0.4),
+                : const Color(AppColors.accentValue).withValues(alpha: 0.4),
             width: 1.5,
             style: BorderStyle.solid,
           ),
@@ -298,40 +349,76 @@ class _UploadScreenState extends State<UploadScreen> {
   }
 
   Widget _buildAnalyzeButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 52,
-      child: _isLoading
-          ? _LoadingButton(message: _loadingMessage)
-          : ElevatedButton(
-              onPressed:
-                  _selectedFiles.isEmpty ? null : _runAnalysis,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(AppColors.accentValue),
-                foregroundColor: Colors.white,
-                disabledBackgroundColor:
-                    const Color(AppColors.borderValue),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                elevation: 0,
+    if (_isLoading) {
+      return SizedBox(
+        width: double.infinity,
+        height: 52,
+        child: _LoadingButton(message: _loadingMessage),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        SizedBox(
+          height: 52,
+          child: ElevatedButton(
+            onPressed: _selectedFiles.isEmpty ? null : _runAnalysis,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(AppColors.accentValue),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(AppColors.borderValue),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                'Analyze Documents',
-                style: GoogleFonts.inter(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w600,
-                ),
+              elevation: 0,
+            ),
+            child: Text(
+              'Analyze Documents',
+              style: GoogleFonts.inter(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
               ),
             ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton(
+          onPressed: _openDemo,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(AppColors.textSecondaryValue),
+            side: const BorderSide(color: Color(AppColors.borderValue)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 14),
+          ),
+          child: Text(
+            'Try Demo Data',
+            style: GoogleFonts.inter(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'V1 evidence view is always available. V2 issue view appears when the backend can structure the same session.',
+          style: GoogleFonts.inter(
+            fontSize: 12,
+            height: 1.5,
+            color: const Color(AppColors.textTertiaryValue),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildHowItWorks() {
     const steps = [
       (Icons.upload_outlined, 'Upload', 'Select 1–5 research PDFs'),
-      (Icons.hub_outlined, 'Analyze', 'Backend finds matching claims'),
-      (Icons.auto_awesome, 'Refine', 'Gemini explains the findings'),
+      (Icons.hub_outlined, 'Analyze', 'V1 finds agreements and contradictions'),
+      (Icons.auto_awesome, 'Review', 'Inspect evidence first, then optional issues'),
     ];
 
     return Column(
@@ -484,10 +571,10 @@ class _LoadingButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(AppColors.accentValue).withOpacity(0.08),
+        color: const Color(AppColors.accentValue).withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-            color: const Color(AppColors.accentValue).withOpacity(0.3)),
+            color: const Color(AppColors.accentValue).withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -508,6 +595,97 @@ class _LoadingButton extends StatelessWidget {
               color: const Color(AppColors.accentValue),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackendStatusCard extends StatelessWidget {
+  final bool isChecking;
+  final HealthResponse? health;
+  final VoidCallback onRefresh;
+
+  const _BackendStatusCard({
+    required this.isChecking,
+    required this.health,
+    required this.onRefresh,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusLabel = isChecking
+        ? 'Checking backend'
+        : health?.isReady == true
+            ? 'Backend ready'
+            : 'Backend offline';
+    final color = isChecking
+        ? const Color(AppColors.accentValue)
+        : health?.isReady == true
+            ? const Color(AppColors.agreementColorValue)
+            : const Color(AppColors.uncorroboratedColorValue);
+
+    final body = isChecking
+        ? 'Confirming model availability at ${AppConfig.backendBaseUrl}.'
+        : health?.isReady == true
+            ? 'Live analysis is available at ${AppConfig.backendBaseUrl}.'
+            : 'Live analysis is unavailable right now. You can still open the built-in demo session.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(AppColors.borderValue)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  statusLabel,
+                  style: GoogleFonts.inter(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: const Color(AppColors.textPrimaryValue),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  body,
+                  style: GoogleFonts.inter(
+                    fontSize: 12,
+                    height: 1.45,
+                    color: const Color(AppColors.textSecondaryValue),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!isChecking)
+            IconButton(
+              onPressed: onRefresh,
+              icon: const Icon(
+                Icons.refresh_rounded,
+                size: 18,
+                color: Color(AppColors.textTertiaryValue),
+              ),
+              tooltip: 'Refresh backend status',
+            ),
         ],
       ),
     );
